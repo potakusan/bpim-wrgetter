@@ -79,8 +79,12 @@ class WRGetter {
                     notFound.push(songTitle);
                     continue;
                 }
-                if (target <= Number(this.def[i]["wr"])) {
-                    console.log(`${songTitle}:SAME WR. SKIPPED, ${target}`);
+                if (target === Number(this.def[i]["wr"])) {
+                    console.log(`${songTitle}:SAME WR. SKIPPED(EQUAL), OLD:${this.def[i]["wr"]},NEW:${target}`);
+                    continue;
+                }
+                if (target < Number(this.def[i]["wr"])) {
+                    console.log(`${songTitle}:SAME WR. SKIPPED(LOW), OLD:${this.def[i]["wr"]},NEW:${target}`);
                     continue;
                 }
                 console.log(`${songTitle}:OLD=${this.def[i]["wr"]},NEW=${target}`);
