@@ -13,8 +13,8 @@ class WRGetter {
   private ranks:any = {};
   private decodeAsText = (arrayBuffer:ArrayBuffer, encoding:string) => new TextDecoder(encoding).decode(arrayBuffer);
 
-  private getCurrentDefFile(){
-    return fetch("https://proxy.poyashi.me/?type=bpi");
+  private getCurrentDefFile(q:string = "bpi"){
+    return fetch("https://proxy.poyashi.me/?type=" + q);
   }
 
   private getWR(version:string){
@@ -34,6 +34,13 @@ class WRGetter {
       )
     })
   }
+
+  private diffObj = {
+    "3":"hyper",
+    "4":"another",
+    "10":"leggendaria"
+  }
+  private notFound:string[] = [];
 
   public async run(){
     console.log("b");
@@ -61,35 +68,67 @@ class WRGetter {
         }
       }
     }
-    console.log(this.ranks);
-    const diffObj = {
-      "3":"hyper",
-      "4":"another",
-      "10":"leggendaria"
-    }
-    const notFound:string[] = [];
+    this.readReleaseFile();
+    const p1 = await this.readInputFiles("11");
+    const p2 = await this.readInputFiles("12");
+    console.error("SONGS IN WHICH ERROR OCCURED",this.notFound);
+    console.info("INPUT FILE #11 OUTPUT",JSON.stringify(p1));
+    console.info("INPUT FILE #12 OUTPUT",JSON.stringify(p2));
+    console.info("RELEASE FILE OUTPUT",JSON.stringify(this.def));
+    this.checkConsistency(this.def,p1,p2)
+  }
+
+  songTitle = (t:any)=>t["title"] + this.diffObj[(t["difficulty"] as "3"|"4"|"10")];
+
+  readReleaseFile(){
     for(let i = 0; i < this.def.length; ++i){
       const current = this.def[i];
-      const songTitle = current["title"] + diffObj[(current["difficulty"] as "3"|"4"|"10")];
+      const songTitle = this.songTitle(current);
       const target = this.ranks[songTitle];
-      if(!target){
-        notFound.push(songTitle);
-        continue;
-      }
-      if(target === Number(this.def[i]["wr"])){
-        console.log(`${songTitle}:SAME WR. SKIPPED(EQUAL), OLD:${this.def[i]["wr"]},NEW:${target}`);
-        continue;
-      }
-      if(target < Number(this.def[i]["wr"])){
-        console.log(`${songTitle}:SAME WR. SKIPPED(LOW), OLD:${this.def[i]["wr"]},NEW:${target}`);
-        continue;
-      }
-      console.log(`${songTitle}:OLD=${this.def[i]["wr"]},NEW=${target}`);
-      this.def[i]["wr"] = target;
+      this.def[i]["wr"] = this.exec(target,songTitle,this.def[i]["wr"]);
     }
-    console.log(this.def,JSON.stringify(this.def));
-    console.log(notFound);
   }
+
+  async readInputFiles(diff:string){
+    const t = (await  (await this.getCurrentDefFile("bpiSP" + diff)).json());
+    for(let i = 0;i < t.length; ++i){
+      const songTitle = this.songTitle(t[i]);
+      const target = this.ranks[songTitle];
+      t[i]["wr"] = this.exec(target,songTitle,t[i]["wr"]);
+    }
+    return t;
+  }
+
+  exec(target:number,songTitle:string,old:string){
+    if(!target){
+      this.notFound.push(songTitle);
+      return old;
+    }
+    if(target === Number(old)){
+      console.warn(`${songTitle}:SAME WR. SKIPPED(EQUAL), OLD:${old},NEW:${target}`);
+      return old;
+    }
+    if(target < Number(old)){
+      console.warn(`${songTitle}:SAME WR. SKIPPED(LOW), OLD:${old},NEW:${target}`);
+      return old;
+    }
+    console.log(`%c ${songTitle}:OLD=${old},NEW=${target}`, 'color: #ff0000');
+    return target;
+  }
+
+  checkConsistency(def:any[],p1:any[],p2:any[]){
+    const defList = def.reduce((groups,item)=>{
+      groups[this.songTitle(item)] = item;
+      return groups;
+    },{});
+    p1.concat(p2).map((item)=>{
+      const songTitle = this.songTitle(item);
+      if(defList[songTitle] && defList[songTitle]["wr"] !== item["wr"]){
+        console.warn("%c checkConsistencyError:",songTitle,"release:" + defList[songTitle]["wr"],"input:"+item["wr"],"color:#ff0000, background:#000");
+      }
+    });
+  }
+
 }
 
 var t = new WRGetter().run();
